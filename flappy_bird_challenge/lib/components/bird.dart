@@ -1,5 +1,7 @@
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
+import 'package:flame/flame.dart';
+import 'package:flame/sprite.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flappy_bird_challenge/components/ground.dart';
 import 'package:flappy_bird_challenge/components/pipe.dart';
@@ -7,43 +9,64 @@ import 'package:flappy_bird_challenge/constants.dart';
 import 'package:flappy_bird_challenge/game.dart';
 import 'package:flame/particles.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
 
-class Bird extends SpriteComponent with CollisionCallbacks {
+class Bird extends PositionComponent with CollisionCallbacks {
+  late SpriteAnimationComponent birdAnimation;
+  double velocity = 0;
+
   Bird()
       : super(
           position: Vector2(birdStartX, birdStartY),
           size: Vector2(birdWidth, birdHeight),
         );
 
-  // Physical properties
-  double velocity = 0;
-
-  // Load bird sprite
   @override
   Future<void> onLoad() async {
-    sprite = await Sprite.load('Bird.png');
-     add(CircleHitbox()..scale = Vector2.all(0.9));
+    // Load the sprite sheet
+    final spriteSheet = await Flame.images.load('birdSheet.jpg');
 
+    // Create the animation from the sprite sheet
+    final birdAnimationData = SpriteAnimationData.sequenced(
+      amount: 3, // Number of frames
+      stepTime: 0.1, // Time per frame
+      textureSize: Vector2(43, 50), // Size of each frame
+    );
+
+    birdAnimation = SpriteAnimationComponent()
+      ..animation = SpriteAnimation.fromFrameData(spriteSheet, birdAnimationData)
+      ..size = Vector2(64, 64)
+      ..position = Vector2(0, 0)
+      ..playing = false; // Start as not playing
+
+    // Add the bird animation component as a child
+    add(birdAnimation);
+
+    // Add a hitbox for collision detection
+    add(CircleHitbox()..scale = Vector2.all(0.5));
   }
 
-void flap() {
+ void flap() {
   velocity = jumpStrength;
   FlameAudio.play('birdFlap.mp3', volume: 0.5);
 
- 
-  // Create and add a smoke particle effect
+  // Reset and play the animation
+  birdAnimation.animationTicker?.reset();
+  birdAnimation.playing = true;
+
+  // Stop the animation after one cycle
+  birdAnimation.animationTicker?.onComplete = () {
+    birdAnimation.playing = false; // Stop after one complete cycle
+  };
+
+  // Create and add a smoke particle effect with matrix transformation
   final smokeParticle = ParticleSystemComponent(
     particle: Particle.generate(
-      count: 30, // Dense particle effect
+      count: 30,
       lifespan: 0.4,
       generator: (i) {
-        // Apply a rotation for dynamic movement
         final rotationMatrix = Matrix4.rotationZ(0.2);
-
-        // Position the particles relative to the bird's current position
-        // Using the current position and size of the bird to position particles right below it
-        final offsetPosition = Vector2(position.x, position.y + size.y / 2); // Directly below the bird
-
+        final offsetPosition = Vector2(position.x, position.y + size.y / 2);
         final transformedPosition = rotationMatrix.transform(
           Vector4(offsetPosition.x, offsetPosition.y, 0.0, 1.0),
         );
@@ -54,10 +77,10 @@ void flap() {
 
         return AcceleratedParticle(
           acceleration: Vector2(0, 100),
-          speed: Vector2.random() * 60 - Vector2(30, 30), // Faster burst
-          position: rotatedPosition, // Particles spawn relative to bird's position
+          speed: Vector2.random() * 60 - Vector2(30, 30),
+          position: rotatedPosition,
           child: CircleParticle(
-            radius: 4.0, // Noticeable particle size
+            radius: 4.0,
             paint: Paint()
               ..color = const Color.fromARGB(255, 61, 61, 60).withOpacity(0.8)
               ..style = PaintingStyle.fill,
@@ -68,36 +91,45 @@ void flap() {
   );
 
   parent?.add(smokeParticle);
+
+  // Reset the bird animation to the first frame after 1 second
+  Future.delayed(Duration(seconds: 1), () {
+    // Reset the animation to the first frame
+    birdAnimation.animationTicker?.reset();
+  });
 }
 
+@override
+void update(double dt) {
+  // Apply gravity and update position
+  velocity += gravity * dt;
+  position.y += velocity * dt;
 
+  // Prevent the bird from flying off-screen
+  if (position.y < 2) {
+    (parent as FlappyBirdGame).gameOver();
+  }
 
+  // If the bird is falling and the animation is not playing, reset it
+  if (velocity > 0 && !birdAnimation.playing) {
+    birdAnimation.animationTicker?.reset();
+    birdAnimation.playing = true;
+  }
 
+  // Stop the animation when it's not flapping (not playing)
+  if (velocity > 0 && birdAnimation.playing) {
+    birdAnimation.playing = false; // Stop the animation if falling
+  }
+}
 
 
   @override
-  void update(double dt) {
-    // Apply gravity and update position
-    velocity += gravity * dt;
-    position.y += velocity * dt;
-    if (position.y < 2){
+  void onCollision(Set<Vector2> intersectionPoints, PositionComponent other) {
+    super.onCollision(intersectionPoints, other);
+
+    // Handle collision with the ground or pipes
+    if (other is Ground || other is Pipe) {
       (parent as FlappyBirdGame).gameOver();
     }
   }
-
- @override
-void onCollision(Set<Vector2> intersectionPoints, PositionComponent other) {
-  super.onCollision(intersectionPoints, other);
-
-  // Handle collision with the ground
-  if (other is Ground) {
-    (parent as FlappyBirdGame).gameOver();
-  }
-
-  // Handle collision with pipes
-  if (other is Pipe) {
-    (parent as FlappyBirdGame).gameOver();
-  }
-}
-
 }
