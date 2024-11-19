@@ -1,7 +1,6 @@
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
-import 'package:flame/sprite.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flappy_bird_challenge/components/ground.dart';
 import 'package:flappy_bird_challenge/components/pipe.dart';
@@ -9,8 +8,7 @@ import 'package:flappy_bird_challenge/constants.dart';
 import 'package:flappy_bird_challenge/game.dart';
 import 'package:flame/particles.dart';
 import 'package:flutter/material.dart';
-import 'dart:math';
-
+import 'package:flutter/widgets.dart';
 class Bird extends PositionComponent with CollisionCallbacks {
   late SpriteAnimationComponent birdAnimation;
   double velocity = 0;
@@ -59,14 +57,15 @@ class Bird extends PositionComponent with CollisionCallbacks {
     birdAnimation.playing = false; // Stop after one complete cycle
   };
 
-  // Create and add a smoke particle effect with matrix transformation
+  // Create and add a smoke particle effect below the bird
   final smokeParticle = ParticleSystemComponent(
     particle: Particle.generate(
       count: 30,
       lifespan: 0.4,
       generator: (i) {
         final rotationMatrix = Matrix4.rotationZ(0.2);
-        final offsetPosition = Vector2(position.x, position.y + size.y / 2);
+        // Position the particles below the bird
+        final offsetPosition = Vector2(position.x, position.y + size.y / 15+ 1); 
         final transformedPosition = rotationMatrix.transform(
           Vector4(offsetPosition.x, offsetPosition.y, 0.0, 1.0),
         );
@@ -98,6 +97,7 @@ class Bird extends PositionComponent with CollisionCallbacks {
     birdAnimation.animationTicker?.reset();
   });
 }
+
 
 @override
 void update(double dt) {

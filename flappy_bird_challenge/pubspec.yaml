@@ -38,6 +38,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flame: ^1.21.0
   flame_audio: ^2.10.5 
+  audioplayers: ^6.0.0
   assets_audio_player: ^3.0.8
   flutter_bloc: ^8.0.0
   equatable: ^2.0.0
